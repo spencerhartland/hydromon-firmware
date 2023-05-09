@@ -1,0 +1,31 @@
+{
+    "lcd-standby-message": "go vegan!",
+    "lcd-alert-message": "DRINK NOW!",
+    "lcd-standby-color": {
+        "red": 0,
+        "green": 255,
+        "blue": 0
+    },
+    "lcd-alert-color": {
+        "red": 255,
+        "green": 0,
+        "blue": 0
+    },
+    "led-standby-color": {
+        "red": 0,
+        "green": 255,
+        "blue": 0
+    },
+    "led-alert-color": {
+        "red": 255,
+        "green": 0,
+        "blue": 0
+    },
+    "standby-timeout": 5,
+    "alert-timeout": 5,
+    "alert-delay": 60,
+    "oled-max-brightness": 255,
+    "sip-size": 60,
+    "local-network-ssid": "01101000",
+    "local-network-password": "Airp0rt!"
+}
