@@ -1,37 +1,35 @@
 from aioble import aioble
 import bluetooth
-
-class ServicesManager:
-    def __init__(self, services):
-        """
-        Creates an instance of `ServicesManager` which can be used to manage the
-        specified services.
+from UUIDs import UUIDs
+from PreferencesManager import PreferencesManager
         
-        Arguments:
-            services (dict) - A dictionary using the format specified below that contains
-                the services and characteristics you wish to manage.
-                
-                ```
-                services = {
-                    serviceUUID_1: {
-                        characteristicUUID_1: (value, read, write),
-                        ...
-                        characteristicUUID_X: (value, read, write)
-                    },
-                    ...
-                    serviceUUID_2: {
-                        characteristicUUID_1: (value, read, write),
-                        ...
-                        characteristicUUID_X: (value, read, write)
-                    }
-                }
-                ```
-                
-        Returns:
-            ServiceManager - An instance of type `ServiceManager` which can be used to
-                initialize and manager `aioble.Service` and `aioble.Characteristic` objects.
-        """
-        self._services = services
+class ServicesManager:
+    MFC_NAME = "Spencer Hartland"
+    MODEL_NUM = "M00000001"
+    FIRMWARE_REV = "1.0.0"
+    SOFTWARE_REV = "1.0.0"
+    
+    def __init__(self, preferencesManager):
+        self._prefs = preferencesManager.getAll()
+        self._services = {
+            # { service: {characteristic, characteristic, ...} }
+            # Device Information Service
+            UUIDs.DEV_INFO_SERVICE: {
+                # {UUID: (vaue, read, write), ...}
+                # Manufacturer's Name String
+                UUIDs.DIS_MFC_NAME: (self.MFC_NAME, True, False),
+                # Model Number String
+                UUIDs.DIS_MODEL_NUM: (self.MODEL_NUM, True, False),
+                # Firmware Revision String
+                UUIDs.DIS_FIRMWARE_REV: (self.FIRMWARE_REV, True, False),
+                # Software Revision String
+                UUIDs.DIS_SOFTWARE_REV: (self.SOFTWARE_REV, True, False)
+            }
+        }
+        # Preferences Service
+        self._services[UUIDs.PREFERENCES_SERVICE] = {}
+        for uuid, value in self._prefs:
+            self._services[UUIDs.PREFERENCES_SERVICE][uuid] = (value, True, True)
 
     # Returns (Service, [Characteristic, Characteristic, ...])
     def createService(self, uuid):
@@ -52,11 +50,5 @@ class ServicesManager:
             result = (service, chars)
             
         return result
-
-if __name__ == "__main__":
-    import HydromonServices as Services
-    manager = ServicesManager(Services.dictionary)
-    devInfoService = manager.createService(Services.UUIDs.DEV_INFO_SERVICE)
-    print(devInfoService)
     
     

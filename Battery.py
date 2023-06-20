@@ -1,20 +1,22 @@
 from machine import ADC, Pin
 import time
 
-class Battery:
-    # Icons for battery percentage display
-    EMPTY_ICON = bytearray([0x0E, 0x1B, 0x11, 0x11, 0x11, 0x11, 0x11, 0x1F])
-    
+class Battery:   
     # System input voltage
-    _VSYS = ADC(29)
-    # Indicates whether or not USB power is connected
-    _CHARGING = Pin(24, Pin.IN)
-    # Used to convert raw ADC value to voltage
-    _CONVERSION_FACTOR = 3 * 3.3 / 65535
+    _ADC1_CH0 = ADC(Pin(1))
+    _ADC_RES = 4096
     
     # Reference voltages
+    _VSYS = 3.3
     _FULL_BATTERY = 4.2
     _EMPTY_BATTERY = 2.8
+    
+    def voltage(self):
+        # convert the raw ADC reading into volts
+        raw = self._ADC1_CH0.read()
+        voltage = (raw * self._VSYS) / self._ADC_RES
+        return voltage
+        
     
     def percentage(self):
         """
@@ -23,10 +25,11 @@ class Battery:
         Returns:
         percentage (float) -- The battery's state of charge as a percentage.
         """
-        # convert the raw ADC read into a voltage, and then a percentage
-        voltage = self._VSYS.read_u16() * self._CONVERSION_FACTOR
+        voltage = self.voltage()
         percentage = 100 * ((voltage - self._EMPTY_BATTERY) / (self._FULL_BATTERY - self._EMPTY_BATTERY))
         if percentage > 100:
             percentage = 100.0
+        elif percentage < 0:
+            percentage = 0.0
             
         return percentage

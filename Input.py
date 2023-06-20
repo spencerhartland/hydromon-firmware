@@ -1,9 +1,10 @@
-import _thread
+import uasyncio as asyncio
 from machine import Pin
+import utime
 
-QUICK_TAP = "quick-tap"
-SHORT_PRESS = "short-press"
-LONG_PRESS = "long-press"
+_INPUT_PRESS = "press"
+_INPUT_HOLD = "hold"
+_WATER_DROP_BUTTON_PIN_NUMBER = 42
 
 class Queue:
     def __init__(self):
@@ -42,70 +43,75 @@ class Queue:
                 descStr += "]"
         return descStr
 
-class InputHandler:
+class InputManager:
     def __init__(self):
         # Begin monitoring for input
-        self._inputQueue = Input.Queue()
-        _thread.start_new_thread(self.monitorForInput, (self.inputQueue, ))
+        self._inputQueue = Queue()
+        self._button = AsyncButton(self._inputQueue)
         
-    def monitorForInput(self):
+    async def monitorForInput(self):
         """
         Runs a loop on a background thread that monitors for input (button presses).
         Quick tap: user drank water, short press (3 secs): user filled bottle,
         long press (7 secs): enter editing mode.
         """
-        button = Pin(10, Pin.IN, Pin.PULL_UP)
-        sLock.acquire()
         while True:
             try:
-                if not button.value() == True:
-                    sleep(1.0)
-                    if not button.value() == True:
-                        # If the button is still pressed after 1 sec of waiting, check for short press.
-                        sleep(1.0)
-                        if not button.value() == True:
-                            # Officially a short press, check that the user has let go after 3 sec.
-                            sleep(2.0)
-                            if not button.value() == True:
-                                # Still holding... check for a long press
-                                sleep(2.0)
-                                if not button.value() == True:
-                                    # Long press
-                                    self._inputQueue.addInput(LONG_PRESS)
-                            else:
-                                # Short press
-                                self._inputQueue.addInput(SHORT_PRESS)
-                    else:
-                        # Quick tap
-                        self._inputQueue.addInput(QUICK_TAP)
-            except KeyboardInterrupt:
-                sys.exit(0)
-        sLock.release()
-    
-    def parseInputs(self):
-        # Check for inputs
+                await asyncio.sleep(1)
+            except asyncio.CancelledError:
+                break
+            
+    def parseInputs(self, onPress, onHold):
         for i in range(self._inputQueue.length()):
             userInput = self._inputQueue.getInput(i)
-            if userInput == QUICK_TAP:
-                # Quick tap: user drank water
-                monitor.decreaseFillLevel()
-                displayWaterDropIcon()
-                timeSincePreviousAlert += 1
-            elif userInput == SHORT_PRESS:
-                # Short press: user refilled the bottle
-                monitor.resetFillLevel()
-                displayWaterDropAnimation()
-                displayFillLevel(True)
-                timeSincePreviousAlert += 1.0
-            elif userInput == LONG_PRESS:
-                # Long press: enter editing mode
-                server = Server()
-                server.listenForRequests()
-                server.shutdown()
-        inputQueue.reset()
+            if userInput == _INPUT_PRESS:
+                onPress()
+            elif userInput == _INPUT_HOLD:
+                onHold()
+                
+        self._inputQueue.reset()
+        
+class AsyncButton:
+    def __init__(self, queue):
+        self._button = Pin(_WATER_DROP_BUTTON_PIN_NUMBER, Pin.IN, Pin.PULL_UP)
+        self._callback = self.inputCallback
+        self._button.irq(self.irqHandler, Pin.IRQ_FALLING)
+        self._inputQueue = queue
+        
+    def inputCallback(self):
+        initialTime = utime.ticks_ms()
+        while self._button.value() == 0:
+            pass
+        pressTime = utime.ticks_diff(utime.ticks_ms(), initialTime)
+        
+        # `pressTime` less than 50ms indicates bouncing
+        if pressTime > 50 and pressTime < 1000:
+            self._inputQueue.addInput(_INPUT_PRESS)
+        elif pressTime > 1000:
+            self._inputQueue.addInput(_INPUT_HOLD)
+        
+        # Wait added to 'debounce' the button
+        utime.sleep_ms(10)
+        
+    def irqHandler(self, pin):
+        if self._callback:
+            self._callback()
 
+# Example of how to use
+"""
+async def main():
+    waterDropButton = InputManager()
+    try:
+        asyncio.create_task(waterDropButton.monitorForInput())
+        while True:
+            waterDropButton.parseInputs()
+            asyncio.sleep(3)
+    except Exception as e:
+        print(f"{type(e).__name__}: {str(e)}")
+        import sys
+        sys.exit()
 
-        """
-        TODO: Fix `parseInputs` by adding parameters that take functions as input and call them for each
-        input type. Implement input handling using `InputHandler` in `main.py` and `server.py`.
-        """
+if __name__ == "__main__":
+    asyncio.run(main())
+"""
+    
